@@ -1,0 +1,11 @@
+🚀 WEBCRAFT GITHUB SETUP - RUN THESE COMMANDS AFTER CREATING REPO:
+
+Replace YOUR_USERNAME with your actual GitHub username:
+
+git remote add origin https://github.com/YOUR_USERNAME/webcraft.git
+git branch -M main
+git push -u origin main
+
+Then delete this file: rm QUICK_SETUP.txt
+
+Repository will be live at: https://github.com/YOUR_USERNAME/webcraft
