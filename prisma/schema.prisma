@@ -1,0 +1,68 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  avatarUrl String?  @map("avatar_url")
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  // Relations
+  projects  Project[]
+  
+  @@map("users")
+}
+
+model Template {
+  id           String   @id @default(cuid())
+  name         String
+  category     String
+  metadata     Json
+  previewImage String?  @map("preview_image")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  
+  // Relations
+  projects     Project[]
+  
+  @@map("templates")
+}
+
+model Project {
+  id           String      @id @default(cuid())
+  userId       String      @map("user_id")
+  templateId   String      @map("template_id")
+  name         String
+  data         Json
+  generatedUrl String?     @map("generated_url")
+  status       ProjectStatus @default(DRAFT)
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+  
+  // Relations
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template     Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  
+  @@map("projects")
+}
+
+enum ProjectStatus {
+  DRAFT
+  GENERATING
+  COMPLETED
+  DEPLOYED
+  FAILED
+}
