@@ -5,8 +5,8 @@ import { z } from 'zod'
 
 // Schema for marketplace template queries
 const marketplaceQuerySchema = z.object({
-  category: z.string().optional(),
-  search: z.string().optional(),
+  category: z.string().nullable().optional(),
+  search: z.string().nullable().optional(),
   sortBy: z.enum(['popular', 'newest', 'rating', 'price']).default('popular'),
   minPrice: z.number().optional(),
   maxPrice: z.number().optional(),
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     const query = marketplaceQuerySchema.parse({
       category: searchParams.get('category'),
       search: searchParams.get('search'),
-      sortBy: searchParams.get('sortBy') as 'popular' | 'newest' | 'rating' | 'price',
+      sortBy: searchParams.get('sortBy') || 'popular',
       minPrice: searchParams.get('minPrice') ? Number(searchParams.get('minPrice')) : undefined,
       maxPrice: searchParams.get('maxPrice') ? Number(searchParams.get('maxPrice')) : undefined,
       isPremium: searchParams.get('isPremium') ? searchParams.get('isPremium') === 'true' : undefined,

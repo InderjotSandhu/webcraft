@@ -6,12 +6,16 @@ import CredentialsProvider from "next-auth/providers/credentials"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 
-export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma) as any,
-  providers: [
+// Create providers array conditionally
+const providers = []
+
+// Add Google provider if credentials are available
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && 
+    process.env.GOOGLE_CLIENT_ID !== 'your-google-client-id') {
+  providers.push(
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
       profile(profile) {
         return {
           id: profile.sub,
@@ -20,10 +24,17 @@ export const authOptions: NextAuthOptions = {
           image: profile.picture,
         }
       },
-    }),
+    })
+  )
+}
+
+// Add GitHub provider if credentials are available
+if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET &&
+    process.env.GITHUB_CLIENT_ID !== 'your-github-client-id') {
+  providers.push(
     GitHubProvider({
-      clientId: process.env.GITHUB_CLIENT_ID!,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+      clientId: process.env.GITHUB_CLIENT_ID,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET,
       profile(profile) {
         return {
           id: profile.id.toString(),
@@ -32,8 +43,13 @@ export const authOptions: NextAuthOptions = {
           image: profile.avatar_url,
         }
       },
-    }),
-    CredentialsProvider({
+    })
+  )
+}
+
+// Add credentials provider (always available)
+providers.push(
+  CredentialsProvider({
       name: "credentials",
       credentials: {
         email: { label: "Email", type: "email" },
@@ -74,7 +90,11 @@ export const authOptions: NextAuthOptions = {
         }
       }
     })
-  ],
+)
+
+export const authOptions: NextAuthOptions = {
+  adapter: PrismaAdapter(prisma) as any,
+  providers,
   session: {
     strategy: "jwt",
   },
