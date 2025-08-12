@@ -11,7 +11,7 @@ export interface TemplateField {
   required: boolean
   placeholder?: string
   options?: string[] // For select fields
-  max_size?: string // For image fields
+  maxSize?: string // For image fields
   max_items?: number // For array fields
 }
 
@@ -51,6 +51,17 @@ export type TemplateCategory =
   | 'blog'
   | 'ecommerce'
 
+// Extended Template interface for frontend use
+export interface ExtendedTemplate extends Omit<Template, 'metadata'> {
+  metadata: {
+    description: string
+    tags: string[]
+    previewImage?: string
+    features?: string[]
+    fields: TemplateField[]
+  }
+}
+
 // Extended types with relations
 export interface ProjectWithRelations extends Project {
   user: User
@@ -79,8 +90,8 @@ export interface AppState {
   setIsLoading: (loading: boolean) => void
   
   // Template gallery state
-  templates: Template[]
-  setTemplates: (templates: Template[]) => void
+  templates: ExtendedTemplate[]
+  setTemplates: (templates: ExtendedTemplate[]) => void
   selectedCategory: TemplateCategory | 'all'
   setSelectedCategory: (category: TemplateCategory | 'all') => void
 }

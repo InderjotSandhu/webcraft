@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
@@ -16,10 +17,11 @@ import { Palette, User, LogOut, Settings, FolderOpen } from 'lucide-react'
 
 export function Navbar() {
   const { user, setUser } = useAppStore()
+  const router = useRouter()
 
   const handleLogout = () => {
     setUser(null)
-    // Additional logout logic here
+    router.push('/')
   }
 
   return (
@@ -111,10 +113,10 @@ export function Navbar() {
             ) : (
               <div className="flex items-center space-x-2">
                 <Button variant="ghost" asChild>
-                  <Link href="/auth/signin">Sign In</Link>
+                  <Link href="/login">Sign In</Link>
                 </Button>
                 <Button asChild>
-                  <Link href="/auth/signup">Get Started</Link>
+                  <Link href="/signup">Get Started</Link>
                 </Button>
               </div>
             )}
