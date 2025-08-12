@@ -2,13 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { promises as fs } from 'fs'
 import path from 'path'
+import { prisma } from '@/lib/prisma'
+import { TemplateEngine, TemplateConfig } from '@/lib/template-engine'
 
 // Validation schema for generation request
 const generateSchema = z.object({
   templateId: z.string().min(1),
   projectName: z.string().min(1).max(100),
   formData: z.record(z.string()),
-  userId: z.string().optional(), // For future authentication
+  userId: z.string().min(1, 'User ID is required')
 })
 
 type GenerateRequest = z.infer<typeof generateSchema>
@@ -322,7 +324,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { templateId, projectName, formData } = validationResult.data
+    const { templateId, projectName, formData, userId } = validationResult.data
 
     // Get template
     const template = getTemplateById(templateId)
@@ -351,29 +353,49 @@ export async function POST(request: NextRequest) {
     // Generate project ID
     const projectId = generateProjectId()
 
-    // Process template with user data
-    const generatedHtml = processTemplate(template.htmlTemplate, formData)
-
-    // Save generated site
-    const siteUrl = await saveGeneratedSite(projectId, generatedHtml)
-
-    // In production, save project to database here
-    const projectData = {
-      id: projectId,
-      name: projectName,
-      templateId,
-      formData,
-      generatedUrl: siteUrl,
-      status: 'COMPLETED',
-      createdAt: new Date().toISOString(),
+    // Convert template to new format
+    const templateConfig: TemplateConfig = {
+      id: template.id,
+      name: template.name,
+      category: template.category,
+      assets: {
+        html: template.htmlTemplate
+      },
+      fields: template.fields
     }
 
+    // Use enhanced template engine
+    const engine = new TemplateEngine(projectId)
+    const siteUrl = await engine.processTemplate(templateConfig, formData)
+
+    // Save project to database
+    const project = await prisma.project.create({
+      data: {
+        userId: userId,
+        templateId: templateId,
+        name: projectName,
+        data: formData,
+        generatedUrl: siteUrl,
+        status: 'COMPLETED'
+      },
+      include: {
+        template: {
+          select: {
+            id: true,
+            name: true,
+            category: true,
+            previewImage: true
+          }
+        }
+      }
+    })
+
     // Simulate processing time
-    await new Promise(resolve => setTimeout(resolve, 2000))
+    await new Promise(resolve => setTimeout(resolve, 1000))
 
     return NextResponse.json({
       success: true,
-      project: projectData,
+      project: project,
       message: 'Website generated successfully!'
     })
 

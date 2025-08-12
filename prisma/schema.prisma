@@ -14,16 +14,88 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  avatarUrl String?  @map("avatar_url")
-  createdAt DateTime @default(now()) @map("created_at")
+  id            String    @id @default(cuid())
+  email         String?   @unique
+  name          String?
+  avatarUrl     String?   @map("avatar_url")
+  emailVerified DateTime? @map("email_verified")
+  image         String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  
+  // Security Fields
+  twoFactorEnabled    Boolean @default(false) @map("two_factor_enabled")
+  twoFactorSecret     String? @map("two_factor_secret")
+  twoFactorBackupCodes String? @map("two_factor_backup_codes") // JSON string array
+  twoFactorVerified   DateTime? @map("two_factor_verified")
+  lastLoginAt         DateTime? @map("last_login_at")
+  failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
+  lockedUntil         DateTime? @map("locked_until")
   
   // Relations
-  projects  Project[]
+  projects         Project[]
+  accounts         Account[]
+  sessions         Session[]
+  
+  // Team Relations
+  ownedTeams       Team[]           @relation("TeamOwner")
+  teamMemberships  TeamMember[]
+  invitationsSent  TeamInvitation[] @relation("InvitationSender")
+  invitationsReceived TeamInvitation[] @relation("InvitationReceiver")
+  activities       TeamActivity[]
+  
+  // Security Relations
+  twoFactorTokens  TwoFactorToken[]
+  auditLogs        SecurityAuditLog[]
+  userSessions     UserSession[]
+  
+  // Template Marketplace Relations
+  templates        Template[]
+  templateReviews  TemplateReview[]
+  templatePurchases TemplatePurchase[]
+  templateFavorites TemplateFavorite[]
   
   @@map("users")
+}
+
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String  @map("user_id")
+  type               String
+  provider           String
+  providerAccountId  String  @map("provider_account_id")
+  refresh_token      String? @map("refresh_token")
+  access_token       String? @map("access_token")
+  expires_at         Int?    @map("expires_at")
+  token_type         String? @map("token_type")
+  scope              String?
+  id_token           String? @map("id_token")
+  session_state      String? @map("session_state")
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+  
+  @@unique([identifier, token])
+  @@map("verificationtokens")
 }
 
 model Template {
@@ -35,8 +107,25 @@ model Template {
   isActive     Boolean  @default(true) @map("is_active")
   createdAt    DateTime @default(now()) @map("created_at")
   
+  // Marketplace Fields
+  authorId     String?  @map("author_id")
+  isPublic     Boolean  @default(false) @map("is_public")
+  isPremium    Boolean  @default(false) @map("is_premium")
+  price        Float?   @default(0)
+  downloads    Int      @default(0)
+  averageRating Float?  @map("average_rating")
+  totalRatings Int      @default(0) @map("total_ratings")
+  description  String?
+  tags         String?  // JSON array
+  license      String?  @default("MIT")
+  version      String?  @default("1.0.0")
+  
   // Relations
   projects     Project[]
+  author       User?    @relation(fields: [authorId], references: [id])
+  reviews      TemplateReview[]
+  purchases    TemplatePurchase[]
+  favorites    TemplateFavorite[]
   
   @@map("templates")
 }
@@ -56,7 +145,116 @@ model Project {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   template     Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
   
+  // Performance Monitoring Relations
+  performanceMetrics PerformanceMetric[]
+  errorLogs          ErrorLog[]
+  uptimeChecks       UptimeCheck[]
+  
   @@map("projects")
+}
+
+// Team Collaboration Models
+model Team {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  slug        String   @unique
+  ownerId     String   @map("owner_id")
+  settings    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  // Relations
+  owner       User           @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members     TeamMember[]
+  invitations TeamInvitation[]
+  activities  TeamActivity[]
+  
+  @@map("teams")
+}
+
+model TeamMember {
+  id        String   @id @default(cuid())
+  teamId    String   @map("team_id")
+  userId    String   @map("user_id")
+  role      TeamRole @default(MEMBER)
+  joinedAt  DateTime @default(now()) @map("joined_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  // Relations
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([teamId, userId])
+  @@map("team_members")
+}
+
+model TeamInvitation {
+  id         String           @id @default(cuid())
+  teamId     String           @map("team_id")
+  email      String
+  role       TeamRole         @default(MEMBER)
+  status     InvitationStatus @default(PENDING)
+  token      String           @unique
+  senderId   String           @map("sender_id")
+  receiverId String?          @map("receiver_id")
+  expiresAt  DateTime         @map("expires_at")
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime         @updatedAt @map("updated_at")
+  
+  // Relations
+  team     Team  @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  sender   User  @relation("InvitationSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User? @relation("InvitationReceiver", fields: [receiverId], references: [id])
+  
+  @@unique([teamId, email])
+  @@map("team_invitations")
+}
+
+model TeamActivity {
+  id          String       @id @default(cuid())
+  teamId      String       @map("team_id")
+  userId      String       @map("user_id")
+  action      ActivityType
+  entityType  String       @map("entity_type")
+  entityId    String?      @map("entity_id")
+  metadata    Json?
+  createdAt   DateTime     @default(now()) @map("created_at")
+  
+  // Relations
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("team_activities")
+}
+
+// Enums
+enum TeamRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+enum ActivityType {
+  TEAM_CREATED
+  TEAM_UPDATED
+  MEMBER_INVITED
+  MEMBER_JOINED
+  MEMBER_LEFT
+  MEMBER_REMOVED
+  MEMBER_ROLE_CHANGED
+  PROJECT_CREATED
+  PROJECT_UPDATED
+  PROJECT_DELETED
+  PROJECT_SHARED
 }
 
 enum ProjectStatus {
@@ -65,4 +263,216 @@ enum ProjectStatus {
   COMPLETED
   DEPLOYED
   FAILED
+}
+
+// Advanced Security Models
+model TwoFactorToken {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  type      TokenType @default(VERIFICATION)
+  expiresAt DateTime @map("expires_at")
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("two_factor_tokens")
+}
+
+model SecurityAuditLog {
+  id          String         @id @default(cuid())
+  userId      String?        @map("user_id")
+  sessionId   String?        @map("session_id")
+  action      SecurityAction
+  details     Json?
+  ipAddress   String?        @map("ip_address")
+  userAgent   String?        @map("user_agent")
+  location    String?
+  success     Boolean        @default(true)
+  timestamp   DateTime       @default(now())
+  
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("security_audit_logs")
+}
+
+model UserSession {
+  id            String   @id @default(cuid())
+  userId        String   @map("user_id")
+  sessionToken  String   @unique @map("session_token")
+  device        String?
+  browser       String?
+  os            String?
+  ipAddress     String?  @map("ip_address")
+  location      String?
+  lastActive    DateTime @default(now()) @map("last_active")
+  expiresAt     DateTime @map("expires_at")
+  terminated    Boolean  @default(false)
+  createdAt     DateTime @default(now()) @map("created_at")
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("user_sessions")
+}
+
+// Security Enums
+enum SecurityAction {
+  LOGIN_ATTEMPT
+  LOGIN_SUCCESS
+  LOGIN_FAILED
+  LOGOUT
+  PASSWORD_CHANGE
+  EMAIL_CHANGE
+  TWO_FACTOR_ENABLE
+  TWO_FACTOR_DISABLE
+  TWO_FACTOR_VERIFY
+  TWO_FACTOR_BACKUP_USED
+  SUSPICIOUS_ACTIVITY
+  ACCOUNT_LOCKED
+  ACCOUNT_UNLOCKED
+  SESSION_CREATED
+  SESSION_TERMINATED
+  SECURITY_SETTINGS_CHANGE
+  FAILED_2FA_ATTEMPT
+}
+
+enum TokenType {
+  VERIFICATION
+  BACKUP_CODE
+  RECOVERY
+}
+
+// Template Marketplace Models
+model TemplateReview {
+  id         String   @id @default(cuid())
+  templateId String   @map("template_id")
+  userId     String   @map("user_id")
+  rating     Int      // 1-5 stars
+  comment    String?
+  isPublic   Boolean  @default(true) @map("is_public")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  
+  template Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([templateId, userId])
+  @@map("template_reviews")
+}
+
+model TemplatePurchase {
+  id         String        @id @default(cuid())
+  templateId String        @map("template_id")
+  userId     String        @map("user_id")
+  amount     Float
+  currency   String        @default("USD")
+  status     PurchaseStatus @default(COMPLETED)
+  stripeSessionId String?  @map("stripe_session_id")
+  createdAt  DateTime      @default(now()) @map("created_at")
+  
+  template Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("template_purchases")
+}
+
+model TemplateFavorite {
+  id         String   @id @default(cuid())
+  templateId String   @map("template_id")
+  userId     String   @map("user_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  
+  template Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([templateId, userId])
+  @@map("template_favorites")
+}
+
+// Performance Monitoring Models
+model PerformanceMetric {
+  id          String   @id @default(cuid())
+  projectId   String?  @map("project_id")
+  url         String
+  metricType  MetricType
+  value       Float
+  threshold   Float?
+  status      MetricStatus @default(HEALTHY)
+  timestamp   DateTime @default(now())
+  metadata    Json?
+  
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  @@map("performance_metrics")
+}
+
+model ErrorLog {
+  id        String     @id @default(cuid())
+  projectId String?    @map("project_id")
+  level     ErrorLevel @default(ERROR)
+  message   String
+  stack     String?
+  url       String?
+  userAgent String?    @map("user_agent")
+  userId    String?    @map("user_id")
+  resolved  Boolean    @default(false)
+  timestamp DateTime   @default(now())
+  metadata  Json?
+  
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  @@map("error_logs")
+}
+
+model UptimeCheck {
+  id        String      @id @default(cuid())
+  projectId String      @map("project_id")
+  url       String
+  status    UptimeStatus @default(UP)
+  responseTime Int?     @map("response_time")
+  statusCode Int?       @map("status_code")
+  error     String?
+  timestamp DateTime    @default(now())
+  
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  @@map("uptime_checks")
+}
+
+// Marketplace Enums
+enum PurchaseStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+// Performance Monitoring Enums
+enum MetricType {
+  PERFORMANCE_SCORE
+  FIRST_CONTENTFUL_PAINT
+  LARGEST_CONTENTFUL_PAINT
+  CUMULATIVE_LAYOUT_SHIFT
+  TIME_TO_INTERACTIVE
+  SPEED_INDEX
+}
+
+enum MetricStatus {
+  HEALTHY
+  WARNING
+  CRITICAL
+}
+
+enum ErrorLevel {
+  INFO
+  WARN
+  ERROR
+  CRITICAL
+}
+
+enum UptimeStatus {
+  UP
+  DOWN
+  DEGRADED
 }

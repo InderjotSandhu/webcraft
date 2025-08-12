@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useAppStore } from '@/lib/store'
-import { Palette, User, LogOut, Settings, FolderOpen } from 'lucide-react'
+import { Palette, User, LogOut, Settings, FolderOpen, Users, Store, Activity } from 'lucide-react'
 
 export function Navbar() {
   const { user, setUser } = useAppStore()
@@ -43,6 +43,12 @@ export function Navbar() {
               className="text-sm font-medium transition-colors hover:text-primary"
             >
               Templates
+            </Link>
+            <Link 
+              href="/marketplace" 
+              className="text-sm font-medium transition-colors hover:text-primary"
+            >
+              Marketplace
             </Link>
             <Link 
               href="/about" 
@@ -94,6 +100,24 @@ export function Navbar() {
                       <Link href="/dashboard">
                         <User className="mr-2 h-4 w-4" />
                         Dashboard
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/teams">
+                        <Users className="mr-2 h-4 w-4" />
+                        Teams
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/marketplace">
+                        <Store className="mr-2 h-4 w-4" />
+                        Marketplace
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/monitoring">
+                        <Activity className="mr-2 h-4 w-4" />
+                        Monitoring
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>

@@ -23,6 +23,10 @@ export const useAppStore = create<AppState>()(
         setTemplates: (templates: Template[]) => set({ templates }),
         selectedCategory: 'all',
         setSelectedCategory: (category: TemplateCategory | 'all') => set({ selectedCategory: category }),
+
+        // Projects state
+        projects: [],
+        setProjects: (projects: any[]) => set({ projects }),
       }),
       {
         name: 'webcraft-store',
